@@ -15,6 +15,19 @@ try:
 except Exception:
     pass
 
+if api_key:
+    api_key = str(api_key).strip()
+    api_key = api_key.replace("“", "").replace("”", "")
+    api_key = api_key.replace("‘", "").replace("’", "")
+    api_key = api_key.strip('"').strip("'")
+
+if not api_key or not api_key.startswith("sk-"):
+    st.error(
+        "OpenAI API key is missing or invalid. "
+        "Please set OPENAI_API_KEY correctly in Streamlit Secrets."
+    )
+    st.stop()
+
 client = OpenAI(api_key=api_key)
 
 st.set_page_config(
