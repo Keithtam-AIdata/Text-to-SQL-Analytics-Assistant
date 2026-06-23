@@ -619,47 +619,194 @@ st.markdown(
 
 
 # -----------------------------
-# Main dashboard
+# Main Overview: AI Assistant + KPI Snapshot
 # -----------------------------
 
-dashboard_tab, assistant_tab, data_tab, method_tab = st.tabs(
-    ["Executive Dashboard", "AI Assistant", "Data Explorer", "How It Works"]
+st.markdown('<div class="section-title">Executive KPI Overview</div>', unsafe_allow_html=True)
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    kpi_card(
+        "Total Revenue",
+        f"${total_revenue:,.0f}",
+        "Total revenue across all regions and product categories."
+    )
+
+with col2:
+    kpi_card(
+        "Total Orders",
+        f"{total_orders:,.0f}",
+        "Total order volume in the simulated business dataset."
+    )
+
+with col3:
+    kpi_card(
+        "Top Region",
+        top_region,
+        "Region with the highest total revenue."
+    )
+
+with col4:
+    kpi_card(
+        "Best Efficiency",
+        best_marketing_region,
+        "Highest revenue generated per marketing dollar."
+    )
+
+st.markdown("")
+
+overview_left, overview_right = st.columns([0.92, 1.08])
+
+with overview_left:
+    st.markdown('<div class="section-title">Ask the AI Business Analyst</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        """
+        <div class="insight-card">
+            <div class="insight-title">Natural Language KPI Analysis</div>
+            <div class="insight-text">
+                Ask a business question about revenue, orders, AOV, conversion rate, return rate,
+                customer satisfaction, or marketing efficiency. The assistant calculates relevant KPI context first,
+                then generates a structured business recommendation.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("")
+
+    question = st.text_area(
+        "Business question",
+        key="question_input",
+        height=115,
+        placeholder="Example: Which region has the best marketing efficiency?"
+    )
+
+    analyze_button = st.button(
+        "Analyze KPI Performance",
+        type="primary",
+        use_container_width=True
+    )
+
+with overview_right:
+    st.markdown('<div class="section-title">AI Business Analysis</div>', unsafe_allow_html=True)
+
+    if analyze_button and question:
+        with st.spinner("Analyzing KPI data and generating business insight..."):
+            st.session_state.analysis_answer = generate_ai_answer(question, df)
+            st.session_state.last_question = question
+
+    elif analyze_button and not question:
+        st.warning("Please enter a business question first.")
+
+    if st.session_state.analysis_answer:
+        st.markdown(f"**Question:** {st.session_state.last_question}")
+
+        with st.container(border=True):
+            st.markdown(st.session_state.analysis_answer)
+    else:
+        st.markdown(
+            """
+            <div class="insight-card">
+                <div class="insight-title">Ready to Analyze</div>
+                <div class="insight-text">
+                    Choose a sample question from the sidebar or type your own question.
+                    The response will include a direct answer, KPI evidence, business interpretation,
+                    and a recommended next step.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+st.divider()
+
+# -----------------------------
+# Snapshot charts on landing page
+# -----------------------------
+
+snapshot_left, snapshot_right = st.columns([1.1, 1])
+
+with snapshot_left:
+    st.markdown('<div class="section-title">Revenue by Region</div>', unsafe_allow_html=True)
+
+    revenue_chart = (
+        alt.Chart(region_perf)
+        .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
+        .encode(
+            x=alt.X("Region:N", sort="-y", title=None),
+            y=alt.Y("Revenue:Q", title="Revenue", axis=alt.Axis(format="$~s")),
+            tooltip=[
+                "Region",
+                alt.Tooltip("Revenue:Q", format="$,.0f"),
+                alt.Tooltip("Orders:Q", format=",.0f"),
+                alt.Tooltip("CustomerSatisfaction:Q"),
+            ],
+            color=alt.value("#2563eb"),
+        )
+        .properties(height=260)
+    )
+
+    st.altair_chart(revenue_chart, use_container_width=True)
+
+with snapshot_right:
+    st.markdown('<div class="section-title">Marketing Efficiency by Region</div>', unsafe_allow_html=True)
+
+    efficiency_chart = (
+        alt.Chart(region_perf)
+        .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
+        .encode(
+            x=alt.X("RevenuePerMarketingDollar:Q", title="Revenue per marketing dollar"),
+            y=alt.Y("Region:N", sort="-x", title=None),
+            tooltip=[
+                "Region",
+                alt.Tooltip("RevenuePerMarketingDollar:Q", format=".2f"),
+                alt.Tooltip("MarketingSpend:Q", format="$,.0f"),
+                alt.Tooltip("Revenue:Q", format="$,.0f"),
+            ],
+            color=alt.value("#0f766e"),
+        )
+        .properties(height=260)
+    )
+
+    st.altair_chart(efficiency_chart, use_container_width=True)
+
+st.markdown('<div class="section-title">Product Category Revenue</div>', unsafe_allow_html=True)
+
+category_chart = (
+    alt.Chart(category_perf)
+    .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
+    .encode(
+        x=alt.X("Revenue:Q", title="Revenue", axis=alt.Axis(format="$~s")),
+        y=alt.Y("ProductCategory:N", sort="-x", title=None),
+        tooltip=[
+            "ProductCategory",
+            alt.Tooltip("Revenue:Q", format="$,.0f"),
+            alt.Tooltip("Orders:Q", format=",.0f"),
+            alt.Tooltip("AverageOrderValue:Q", format="$,.2f"),
+            alt.Tooltip("ReturnRate:Q", format=".2%"),
+        ],
+        color=alt.value("#7c3aed"),
+    )
+    .properties(height=280)
+)
+
+st.altair_chart(category_chart, use_container_width=True)
+
+st.divider()
+
+# -----------------------------
+# Detail Tabs
+# -----------------------------
+
+dashboard_tab, data_tab, method_tab = st.tabs(
+    ["Detailed Dashboard", "Data Explorer", "How It Works"]
 )
 
 with dashboard_tab:
-    st.markdown('<div class="section-title">Executive KPI Overview</div>', unsafe_allow_html=True)
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        kpi_card(
-            "Total Revenue",
-            f"${total_revenue:,.0f}",
-            "Total revenue across all regions and product categories."
-        )
-
-    with col2:
-        kpi_card(
-            "Total Orders",
-            f"{total_orders:,.0f}",
-            "Total order volume in the simulated business dataset."
-        )
-
-    with col3:
-        kpi_card(
-            "Top Region",
-            top_region,
-            "Region with the highest total revenue."
-        )
-
-    with col4:
-        kpi_card(
-            "Best Efficiency",
-            best_marketing_region,
-            "Highest revenue generated per marketing dollar."
-        )
-
-    st.markdown("")
+    st.markdown('<div class="section-title">Business Signals</div>', unsafe_allow_html=True)
 
     insight_col1, insight_col2, insight_col3 = st.columns(3)
 
@@ -707,135 +854,23 @@ with dashboard_tab:
 
     st.divider()
 
-    chart_col1, chart_col2 = st.columns([1.1, 1])
+    st.markdown('<div class="section-title">Regional Performance Table</div>', unsafe_allow_html=True)
 
-    with chart_col1:
-        st.markdown('<div class="section-title">Revenue by Region</div>', unsafe_allow_html=True)
-
-        revenue_chart = (
-            alt.Chart(region_perf)
-            .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
-            .encode(
-                x=alt.X("Region:N", sort="-y", title=None),
-                y=alt.Y("Revenue:Q", title="Revenue", axis=alt.Axis(format="$~s")),
-                tooltip=[
-                    "Region",
-                    alt.Tooltip("Revenue:Q", format="$,.0f"),
-                    alt.Tooltip("Orders:Q", format=",.0f"),
-                    alt.Tooltip("CustomerSatisfaction:Q"),
-                ],
-                color=alt.value("#2563eb"),
-            )
-            .properties(height=300)
-        )
-
-        st.altair_chart(revenue_chart, use_container_width=True)
-
-    with chart_col2:
-        st.markdown('<div class="section-title">Marketing Efficiency</div>', unsafe_allow_html=True)
-
-        efficiency_chart = (
-            alt.Chart(region_perf)
-            .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
-            .encode(
-                x=alt.X("RevenuePerMarketingDollar:Q", title="Revenue per marketing dollar"),
-                y=alt.Y("Region:N", sort="-x", title=None),
-                tooltip=[
-                    "Region",
-                    alt.Tooltip("RevenuePerMarketingDollar:Q", format=".2f"),
-                    alt.Tooltip("MarketingSpend:Q", format="$,.0f"),
-                    alt.Tooltip("Revenue:Q", format="$,.0f"),
-                ],
-                color=alt.value("#0f766e"),
-            )
-            .properties(height=300)
-        )
-
-        st.altair_chart(efficiency_chart, use_container_width=True)
-
-    st.markdown('<div class="section-title">Product Category Performance</div>', unsafe_allow_html=True)
-
-    category_chart = (
-        alt.Chart(category_perf)
-        .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
-        .encode(
-            x=alt.X("Revenue:Q", title="Revenue", axis=alt.Axis(format="$~s")),
-            y=alt.Y("ProductCategory:N", sort="-x", title=None),
-            tooltip=[
-                "ProductCategory",
-                alt.Tooltip("Revenue:Q", format="$,.0f"),
-                alt.Tooltip("Orders:Q", format=",.0f"),
-                alt.Tooltip("AverageOrderValue:Q", format="$,.2f"),
-                alt.Tooltip("ReturnRate:Q", format=".2%"),
-            ],
-            color=alt.value("#7c3aed"),
-        )
-        .properties(height=310)
+    st.dataframe(
+        region_perf.style.format(
+            {
+                "Revenue": "${:,.0f}",
+                "Orders": "{:,.0f}",
+                "MarketingSpend": "${:,.0f}",
+                "CustomerSatisfaction": "{:.2f}",
+                "ReturnRate": "{:.2%}",
+                "ConversionRate": "{:.2%}",
+                "RevenuePerMarketingDollar": "${:.2f}",
+            }
+        ),
+        use_container_width=True,
+        hide_index=True,
     )
-
-    st.altair_chart(category_chart, use_container_width=True)
-
-
-with assistant_tab:
-    left_col, right_col = st.columns([0.95, 1.25])
-
-    with left_col:
-        st.markdown('<div class="section-title">Ask the AI Business Analyst</div>', unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div class="small-muted">
-            Ask about revenue, orders, AOV, conversion rate, return rate, customer satisfaction,
-            or marketing efficiency.
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        question = st.text_area(
-            "Business question",
-            key="question_input",
-            height=120,
-            placeholder="Example: Which region has the best marketing efficiency?"
-        )
-
-        analyze_button = st.button(
-            "Analyze KPI Performance",
-            type="primary",
-            use_container_width=True
-        )
-
-        st.markdown(
-            """
-            <div class="insight-card">
-                <div class="insight-title">What the assistant returns</div>
-                <div class="insight-text">
-                    Direct answer, KPI evidence, business interpretation, and one recommended next step.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with right_col:
-        st.markdown('<div class="section-title">AI Business Analysis</div>', unsafe_allow_html=True)
-
-        if analyze_button and question:
-            with st.spinner("Analyzing KPI data and generating business insight..."):
-                st.session_state.analysis_answer = generate_ai_answer(question, df)
-                st.session_state.last_question = question
-
-        elif analyze_button and not question:
-            st.warning("Please enter a business question first.")
-
-        if st.session_state.analysis_answer:
-            st.markdown(f"**Question:** {st.session_state.last_question}")
-
-            with st.container(border=True):
-                st.markdown(st.session_state.analysis_answer)
-        else:
-            st.info(
-                "Choose a sample question from the sidebar or type your own question to generate an AI business analysis."
-            )
 
 
 with data_tab:
