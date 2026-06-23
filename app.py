@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import streamlit as st
 import altair as alt
@@ -5,7 +6,16 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 load_dotenv()
-client = OpenAI()
+
+api_key = os.getenv("OPENAI_API_KEY")
+
+try:
+    if not api_key and "OPENAI_API_KEY" in st.secrets:
+        api_key = st.secrets["OPENAI_API_KEY"]
+except Exception:
+    pass
+
+client = OpenAI(api_key=api_key)
 
 st.set_page_config(
     page_title="AI Business Analyst Assistant",
