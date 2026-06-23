@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+import altair as alt
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -342,111 +343,215 @@ User Question:
 st.markdown(
     """
     <style>
+    [data-testid="stAppViewContainer"] {
+        background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 45%, #f8fafc 100%);
+    }
+
+    .block-container {
+        padding-top: 1.2rem;
+        padding-bottom: 2rem;
+    }
+
     .hero-container {
-        padding: 2rem 2rem;
-        border-radius: 18px;
+        padding: 2rem 2.2rem;
+        border-radius: 22px;
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #334155 100%);
         color: white;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.2rem;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
     }
 
     .hero-title {
-        font-size: 2.2rem;
-        font-weight: 700;
-        margin-bottom: 0.4rem;
+        font-size: 2.4rem;
+        font-weight: 800;
+        margin-bottom: 0.45rem;
+        letter-spacing: -0.03em;
     }
 
     .hero-subtitle {
         font-size: 1.05rem;
         color: #cbd5e1;
-        max-width: 850px;
+        max-width: 900px;
+        line-height: 1.55;
     }
 
     .badge {
         display: inline-block;
-        padding: 0.35rem 0.65rem;
-        margin-right: 0.4rem;
-        margin-top: 0.8rem;
+        padding: 0.38rem 0.75rem;
+        margin-right: 0.45rem;
+        margin-top: 0.9rem;
         border-radius: 999px;
         background-color: rgba(255,255,255,0.12);
         color: #e2e8f0;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+
+    .kpi-card {
+        background: rgba(255, 255, 255, 0.92);
+        padding: 1.1rem 1.2rem;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+        min-height: 125px;
+    }
+
+    .kpi-label {
+        color: #64748b;
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.45rem;
+    }
+
+    .kpi-value {
+        color: #0f172a;
+        font-size: 1.7rem;
+        font-weight: 800;
+        margin-bottom: 0.25rem;
+    }
+
+    .kpi-note {
+        color: #64748b;
+        font-size: 0.88rem;
+        line-height: 1.4;
     }
 
     .section-title {
-        font-size: 1.25rem;
-        font-weight: 700;
-        margin-top: 1rem;
-        margin-bottom: 0.6rem;
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-top: 0.4rem;
+        margin-bottom: 0.65rem;
     }
 
-    .small-text {
+    .insight-card {
+        background: rgba(255, 255, 255, 0.92);
+        padding: 1.1rem 1.2rem;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+        height: 100%;
+    }
+
+    .insight-title {
+        color: #0f172a;
+        font-size: 1rem;
+        font-weight: 800;
+        margin-bottom: 0.35rem;
+    }
+
+    .insight-text {
+        color: #475569;
+        font-size: 0.93rem;
+        line-height: 1.5;
+    }
+
+    .small-muted {
         color: #64748b;
-        font-size: 0.92rem;
+        font-size: 0.9rem;
+        margin-bottom: 0.8rem;
+    }
+
+    div[data-testid="stButton"] > button {
+        border-radius: 12px;
+        font-weight: 650;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# Hero section
-st.markdown(
-    """
-    <div class="hero-container">
-        <div class="hero-title">📊 ChatGPT-Style Business Analytics Assistant</div>
-        <div class="hero-subtitle">
-            An AI-powered analytics assistant that helps business users ask natural language questions
-            about e-commerce KPI performance and receive structured business insights.
-        </div>
-        <span class="badge">Python</span>
-        <span class="badge">Pandas</span>
-        <span class="badge">OpenAI API</span>
-        <span class="badge">Streamlit</span>
-        <span class="badge">Business Analytics</span>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
-# Prepare KPI metrics
+def kpi_card(label, value, note):
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value}</div>
+            <div class="kpi-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+# -----------------------------
+# Prepare dashboard data
+# -----------------------------
+
 total_revenue = df["Revenue"].sum()
 total_orders = df["Orders"].sum()
 avg_satisfaction = df["CustomerSatisfaction"].mean()
 
+region_perf = (
+    df.groupby("Region")
+    .agg(
+        Revenue=("Revenue", "sum"),
+        Orders=("Orders", "sum"),
+        MarketingSpend=("MarketingSpend", "sum"),
+        CustomerSatisfaction=("CustomerSatisfaction", "mean"),
+        ReturnRate=("ReturnRate", "mean"),
+        ConversionRate=("ConversionRate", "mean"),
+    )
+    .reset_index()
+)
+
+region_perf["RevenuePerMarketingDollar"] = (
+    region_perf["Revenue"] / region_perf["MarketingSpend"]
+).round(2)
+
+region_perf["CustomerSatisfaction"] = region_perf["CustomerSatisfaction"].round(2)
+region_perf["ReturnRate"] = region_perf["ReturnRate"].round(4)
+region_perf["ConversionRate"] = region_perf["ConversionRate"].round(4)
+
+category_perf = (
+    df.groupby("ProductCategory")
+    .agg(
+        Revenue=("Revenue", "sum"),
+        Orders=("Orders", "sum"),
+        AverageOrderValue=("AverageOrderValue", "mean"),
+        ReturnRate=("ReturnRate", "mean"),
+        CustomerSatisfaction=("CustomerSatisfaction", "mean"),
+    )
+    .reset_index()
+)
+
+category_perf["AverageOrderValue"] = category_perf["AverageOrderValue"].round(2)
+category_perf["ReturnRate"] = category_perf["ReturnRate"].round(4)
+category_perf["CustomerSatisfaction"] = category_perf["CustomerSatisfaction"].round(2)
+
 top_region = (
-    df.groupby("Region")["Revenue"]
-    .sum()
-    .sort_values(ascending=False)
-    .index[0]
+    region_perf.sort_values("Revenue", ascending=False)
+    .iloc[0]["Region"]
 )
 
 top_category = (
-    df.groupby("ProductCategory")["Revenue"]
-    .sum()
-    .sort_values(ascending=False)
-    .index[0]
+    category_perf.sort_values("Revenue", ascending=False)
+    .iloc[0]["ProductCategory"]
 )
-
-marketing_efficiency = (
-    df.groupby("Region")
-    .agg(
-        TotalRevenue=("Revenue", "sum"),
-        TotalMarketingSpend=("MarketingSpend", "sum")
-    )
-)
-
-marketing_efficiency["RevenuePerMarketingDollar"] = (
-    marketing_efficiency["TotalRevenue"]
-    / marketing_efficiency["TotalMarketingSpend"]
-).round(2)
 
 best_marketing_region = (
-    marketing_efficiency["RevenuePerMarketingDollar"]
-    .sort_values(ascending=False)
-    .index[0]
+    region_perf.sort_values("RevenuePerMarketingDollar", ascending=False)
+    .iloc[0]["Region"]
 )
 
+lowest_satisfaction_region = (
+    region_perf.sort_values("CustomerSatisfaction", ascending=True)
+    .iloc[0]["Region"]
+)
+
+highest_return_category = (
+    category_perf.sort_values("ReturnRate", ascending=False)
+    .iloc[0]["ProductCategory"]
+)
+
+
+# -----------------------------
 # Sidebar
+# -----------------------------
+
 with st.sidebar:
     st.header("💬 Sample Questions")
 
@@ -455,11 +560,17 @@ with st.sidebar:
         "Which product category has the highest return rate?",
         "Which category has the highest AOV?",
         "Which region generated the highest revenue?",
-        "Summarize regional performance."
+        "Summarize regional performance.",
     ]
 
     if "question_input" not in st.session_state:
         st.session_state.question_input = ""
+
+    if "analysis_answer" not in st.session_state:
+        st.session_state.analysis_answer = ""
+
+    if "last_question" not in st.session_state:
+        st.session_state.last_question = ""
 
     for sample_question in sample_questions:
         if st.button(sample_question, use_container_width=True):
@@ -467,98 +578,370 @@ with st.sidebar:
 
     st.divider()
 
-    st.header("📁 Dataset Overview")
+    st.header("📁 Dataset")
     st.write(f"Rows: {len(df)}")
     st.write(f"Regions: {df['Region'].nunique()}")
-    st.write(f"Product Categories: {df['ProductCategory'].nunique()}")
+    st.write(f"Categories: {df['ProductCategory'].nunique()}")
 
     st.divider()
 
-    st.header("🧠 Assistant Capabilities")
-    st.write("Revenue analysis")
-    st.write("Marketing efficiency")
-    st.write("Return rate analysis")
-    st.write("AOV analysis")
-    st.write("Customer satisfaction")
+    st.header("🧠 KPI Engine")
+    st.write("Revenue")
+    st.write("Orders")
+    st.write("AOV")
+    st.write("Conversion Rate")
+    st.write("Return Rate")
+    st.write("Marketing Efficiency")
 
-# KPI cards
-st.markdown('<div class="section-title">Executive KPI Overview</div>', unsafe_allow_html=True)
 
-col1, col2, col3, col4 = st.columns(4)
+# -----------------------------
+# Hero
+# -----------------------------
 
-with col1:
-    st.metric("Total Revenue", f"${total_revenue:,.0f}")
-
-with col2:
-    st.metric("Total Orders", f"{total_orders:,.0f}")
-
-with col3:
-    st.metric("Top Revenue Region", top_region)
-
-with col4:
-    st.metric("Best Marketing Efficiency", best_marketing_region)
-
-st.divider()
-
-# Charts and summary
-left_col, right_col = st.columns([1.15, 1])
-
-with left_col:
-    st.markdown('<div class="section-title">Revenue by Region</div>', unsafe_allow_html=True)
-
-    revenue_by_region = (
-        df.groupby("Region")["Revenue"]
-        .sum()
-        .sort_values(ascending=False)
-    )
-
-    st.bar_chart(revenue_by_region)
-
-with right_col:
-    st.markdown('<div class="section-title">Marketing Efficiency by Region</div>', unsafe_allow_html=True)
-
-    display_efficiency = marketing_efficiency.sort_values(
-        "RevenuePerMarketingDollar",
-        ascending=False
-    )
-
-    st.dataframe(
-        display_efficiency,
-        use_container_width=True
-    )
-
-st.divider()
-
-# Main assistant area
-st.markdown('<div class="section-title">Ask the AI Business Analyst</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="small-text">Ask a natural language question about revenue, orders, AOV, conversion rate, return rate, satisfaction, or marketing efficiency.</div>',
+    """
+    <div class="hero-container">
+        <div class="hero-title">📊 ChatGPT-Style Business Analytics Assistant</div>
+        <div class="hero-subtitle">
+            A product-style AI analytics assistant that turns natural language business questions
+            into KPI-driven insights, evidence, interpretation, and recommended next actions.
+        </div>
+        <span class="badge">Python</span>
+        <span class="badge">Pandas</span>
+        <span class="badge">OpenAI API</span>
+        <span class="badge">Streamlit</span>
+        <span class="badge">Business Analytics</span>
+        <span class="badge">Dynamic KPI Engine</span>
+    </div>
+    """,
     unsafe_allow_html=True
 )
 
-question = st.text_input(
-    "Business question",
-    key="question_input",
-    placeholder="Example: Which region has the best marketing efficiency?",
-    label_visibility="collapsed"
+
+# -----------------------------
+# Main dashboard
+# -----------------------------
+
+dashboard_tab, assistant_tab, data_tab, method_tab = st.tabs(
+    ["Executive Dashboard", "AI Assistant", "Data Explorer", "How It Works"]
 )
 
-analyze_button = st.button("Analyze KPI Performance", type="primary", use_container_width=True)
+with dashboard_tab:
+    st.markdown('<div class="section-title">Executive KPI Overview</div>', unsafe_allow_html=True)
 
-if analyze_button and question:
-    with st.spinner("Analyzing KPI data and generating business insight..."):
-        answer = generate_ai_answer(question, df)
+    col1, col2, col3, col4 = st.columns(4)
 
-    st.markdown('<div class="section-title">AI Business Analysis</div>', unsafe_allow_html=True)
+    with col1:
+        kpi_card(
+            "Total Revenue",
+            f"${total_revenue:,.0f}",
+            "Total revenue across all regions and product categories."
+        )
 
-    with st.chat_message("assistant"):
-        st.markdown(answer)
+    with col2:
+        kpi_card(
+            "Total Orders",
+            f"{total_orders:,.0f}",
+            "Total order volume in the simulated business dataset."
+        )
 
-elif analyze_button and not question:
-    st.warning("Please enter a business question first.")
+    with col3:
+        kpi_card(
+            "Top Region",
+            top_region,
+            "Region with the highest total revenue."
+        )
 
-st.divider()
+    with col4:
+        kpi_card(
+            "Best Efficiency",
+            best_marketing_region,
+            "Highest revenue generated per marketing dollar."
+        )
 
-# Dataset preview
-with st.expander("Preview dataset"):
-    st.dataframe(df.head(20), use_container_width=True)
+    st.markdown("")
+
+    insight_col1, insight_col2, insight_col3 = st.columns(3)
+
+    with insight_col1:
+        st.markdown(
+            f"""
+            <div class="insight-card">
+                <div class="insight-title">Growth Signal</div>
+                <div class="insight-text">
+                    <b>{top_category}</b> is the top revenue category, making it a key area
+                    for growth analysis and category strategy.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with insight_col2:
+        st.markdown(
+            f"""
+            <div class="insight-card">
+                <div class="insight-title">Efficiency Signal</div>
+                <div class="insight-text">
+                    <b>{best_marketing_region}</b> generates the strongest revenue per marketing dollar,
+                    suggesting better marketing efficiency.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with insight_col3:
+        st.markdown(
+            f"""
+            <div class="insight-card">
+                <div class="insight-title">Risk Signal</div>
+                <div class="insight-text">
+                    <b>{lowest_satisfaction_region}</b> has the lowest customer satisfaction,
+                    making it a potential customer experience risk area.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.divider()
+
+    chart_col1, chart_col2 = st.columns([1.1, 1])
+
+    with chart_col1:
+        st.markdown('<div class="section-title">Revenue by Region</div>', unsafe_allow_html=True)
+
+        revenue_chart = (
+            alt.Chart(region_perf)
+            .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
+            .encode(
+                x=alt.X("Region:N", sort="-y", title=None),
+                y=alt.Y("Revenue:Q", title="Revenue", axis=alt.Axis(format="$~s")),
+                tooltip=[
+                    "Region",
+                    alt.Tooltip("Revenue:Q", format="$,.0f"),
+                    alt.Tooltip("Orders:Q", format=",.0f"),
+                    alt.Tooltip("CustomerSatisfaction:Q"),
+                ],
+                color=alt.value("#2563eb"),
+            )
+            .properties(height=300)
+        )
+
+        st.altair_chart(revenue_chart, use_container_width=True)
+
+    with chart_col2:
+        st.markdown('<div class="section-title">Marketing Efficiency</div>', unsafe_allow_html=True)
+
+        efficiency_chart = (
+            alt.Chart(region_perf)
+            .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
+            .encode(
+                x=alt.X("RevenuePerMarketingDollar:Q", title="Revenue per marketing dollar"),
+                y=alt.Y("Region:N", sort="-x", title=None),
+                tooltip=[
+                    "Region",
+                    alt.Tooltip("RevenuePerMarketingDollar:Q", format=".2f"),
+                    alt.Tooltip("MarketingSpend:Q", format="$,.0f"),
+                    alt.Tooltip("Revenue:Q", format="$,.0f"),
+                ],
+                color=alt.value("#0f766e"),
+            )
+            .properties(height=300)
+        )
+
+        st.altair_chart(efficiency_chart, use_container_width=True)
+
+    st.markdown('<div class="section-title">Product Category Performance</div>', unsafe_allow_html=True)
+
+    category_chart = (
+        alt.Chart(category_perf)
+        .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
+        .encode(
+            x=alt.X("Revenue:Q", title="Revenue", axis=alt.Axis(format="$~s")),
+            y=alt.Y("ProductCategory:N", sort="-x", title=None),
+            tooltip=[
+                "ProductCategory",
+                alt.Tooltip("Revenue:Q", format="$,.0f"),
+                alt.Tooltip("Orders:Q", format=",.0f"),
+                alt.Tooltip("AverageOrderValue:Q", format="$,.2f"),
+                alt.Tooltip("ReturnRate:Q", format=".2%"),
+            ],
+            color=alt.value("#7c3aed"),
+        )
+        .properties(height=310)
+    )
+
+    st.altair_chart(category_chart, use_container_width=True)
+
+
+with assistant_tab:
+    left_col, right_col = st.columns([0.95, 1.25])
+
+    with left_col:
+        st.markdown('<div class="section-title">Ask the AI Business Analyst</div>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="small-muted">
+            Ask about revenue, orders, AOV, conversion rate, return rate, customer satisfaction,
+            or marketing efficiency.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        question = st.text_area(
+            "Business question",
+            key="question_input",
+            height=120,
+            placeholder="Example: Which region has the best marketing efficiency?"
+        )
+
+        analyze_button = st.button(
+            "Analyze KPI Performance",
+            type="primary",
+            use_container_width=True
+        )
+
+        st.markdown(
+            """
+            <div class="insight-card">
+                <div class="insight-title">What the assistant returns</div>
+                <div class="insight-text">
+                    Direct answer, KPI evidence, business interpretation, and one recommended next step.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with right_col:
+        st.markdown('<div class="section-title">AI Business Analysis</div>', unsafe_allow_html=True)
+
+        if analyze_button and question:
+            with st.spinner("Analyzing KPI data and generating business insight..."):
+                st.session_state.analysis_answer = generate_ai_answer(question, df)
+                st.session_state.last_question = question
+
+        elif analyze_button and not question:
+            st.warning("Please enter a business question first.")
+
+        if st.session_state.analysis_answer:
+            st.markdown(f"**Question:** {st.session_state.last_question}")
+
+            with st.container(border=True):
+                st.markdown(st.session_state.analysis_answer)
+        else:
+            st.info(
+                "Choose a sample question from the sidebar or type your own question to generate an AI business analysis."
+            )
+
+
+with data_tab:
+    st.markdown('<div class="section-title">Regional Performance Table</div>', unsafe_allow_html=True)
+
+    st.dataframe(
+        region_perf.style.format(
+            {
+                "Revenue": "${:,.0f}",
+                "Orders": "{:,.0f}",
+                "MarketingSpend": "${:,.0f}",
+                "CustomerSatisfaction": "{:.2f}",
+                "ReturnRate": "{:.2%}",
+                "ConversionRate": "{:.2%}",
+                "RevenuePerMarketingDollar": "${:.2f}",
+            }
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown('<div class="section-title">Product Category Performance Table</div>', unsafe_allow_html=True)
+
+    st.dataframe(
+        category_perf.style.format(
+            {
+                "Revenue": "${:,.0f}",
+                "Orders": "{:,.0f}",
+                "AverageOrderValue": "${:.2f}",
+                "ReturnRate": "{:.2%}",
+                "CustomerSatisfaction": "{:.2f}",
+            }
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    with st.expander("Raw dataset preview"):
+        st.dataframe(df.head(30), use_container_width=True)
+
+
+with method_tab:
+    st.markdown('<div class="section-title">How the Assistant Works</div>', unsafe_allow_html=True)
+
+    flow_col1, flow_col2, flow_col3 = st.columns(3)
+
+    with flow_col1:
+        st.markdown(
+            """
+            <div class="insight-card">
+                <div class="insight-title">1. User Question</div>
+                <div class="insight-text">
+                    A business user asks a natural language question about KPI performance.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with flow_col2:
+        st.markdown(
+            """
+            <div class="insight-card">
+                <div class="insight-title">2. Dynamic KPI Engine</div>
+                <div class="insight-text">
+                    Python and Pandas calculate the relevant KPI context based on question intent.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with flow_col3:
+        st.markdown(
+            """
+            <div class="insight-card">
+                <div class="insight-title">3. AI Business Response</div>
+                <div class="insight-text">
+                    OpenAI generates a structured answer with evidence, interpretation, and action.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.divider()
+
+    st.markdown(
+        """
+        **Project Architecture**
+
+        ```text
+        Business Question
+        ↓
+        Dynamic KPI Selection
+        ↓
+        Pandas Calculation
+        ↓
+        Prompt Context
+        ↓
+        OpenAI Response
+        ↓
+        Business Insight
+        ```
+
+        **Key Design Principle:**  
+        The model does not calculate the KPIs by guessing. The Python data layer calculates KPI results first, then the AI explains the results in business language.
+        """
+    )
