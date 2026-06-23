@@ -1,5 +1,7 @@
 # ChatGPT-Style Business Analytics Assistant
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-ff4b4b?logo=streamlit&logoColor=white)](https://ai-business-analyst-assistant-bnzdwzqs6eyetgbfawdnyp.streamlit.app/)
+
 An AI-powered business analytics assistant that allows users to ask natural language questions about e-commerce KPI performance and receive structured, KPI-backed business insights.
 
 This project demonstrates how Python, Pandas, Streamlit, and the OpenAI API can be combined to create a lightweight analytics copilot for business users.
