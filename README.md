@@ -91,6 +91,8 @@ The assistant does not rely on the language model to calculate KPIs by guessing.
 
 Instead, the Python data layer calculates the relevant KPI results first. The calculated results are then passed to the OpenAI model as context, and the model explains the results in clear business language.
 
+For a more detailed technical explanation, see [Architecture Overview](docs/architecture.md).
+
 ---
 
 ## Example Questions
