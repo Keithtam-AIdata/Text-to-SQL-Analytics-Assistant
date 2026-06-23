@@ -104,11 +104,20 @@ Available columns:
 {", ".join(df.columns)}
 """
 
-question = input("Ask a business question: ")
+print("AI Business Analyst Assistant")
+print("Ask a business question about the dataset.")
+print("Type 'exit' to quit.\n")
 
-dynamic_context = get_dynamic_context(question, df)
+while True:
+    question = input("Ask a business question: ")
 
-prompt = f"""
+    if question.lower() == "exit":
+        print("Goodbye.")
+        break
+
+    dynamic_context = get_dynamic_context(question, df)
+
+    prompt = f"""
 You are a ChatGPT-style AI Business Analyst Assistant.
 
 You help business users understand performance data using natural language.
@@ -125,10 +134,11 @@ User Question:
 {question}
 """
 
-response = client.responses.create(
-    model="gpt-5-mini",
-    input=prompt
-)
+    response = client.responses.create(
+        model="gpt-5-mini",
+        input=prompt
+    )
 
-print("\nAI Answer")
-print(response.output_text)
+    print("\nAI Answer")
+    print(response.output_text)
+    print("\n" + "-" * 60 + "\n")
