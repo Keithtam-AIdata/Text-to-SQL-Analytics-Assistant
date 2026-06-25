@@ -1,0 +1,106 @@
+"""
+pipeline.py
+===========
+The full text-to-SQL pipeline with self-correction (Phase 1, Step 4).
+
+Flow:
+    question
+      -> generate SQL            (text_to_sql)
+      -> validate                (sql_guard)        guardrail failure = hard stop
+      -> execute                 (DuckDB)
+      -> on execution error: feed the error back to the model, retry ONCE
+      -> return (sql, dataframe) or a clean error
+
+Why distinguish the two failure types:
+  * A guardrail failure is a SAFETY problem (the model tried something unsafe).
+    Retrying would just waste tokens — we stop.
+  * An execution error is a CAPABILITY problem (wrong column, syntax slip). The
+    model can often fix it if shown the error — so we give it one chance.
+
+Run `python pipeline.py` (duckdb + openai + OPENAI_API_KEY) for a live demo.
+"""
+
+from dataclasses import dataclass
+from typing import Optional
+import pandas as pd
+
+import text_to_sql as t2s
+import sql_guard
+
+
+@dataclass
+class QueryResult:
+    question: str
+    sql: Optional[str]
+    data: Optional[pd.DataFrame]
+    error: Optional[str] = None
+    repaired: bool = False   # True if it succeeded only after self-correction
+    blocked: bool = False    # True if stopped by a guardrail
+
+
+def _build_repair_prompt(question: str, schema: str, bad_sql: str, error: str) -> str:
+    """Prompt for the retry: show the failed SQL and the error, ask for a fix."""
+    return (f"{t2s.SYSTEM_RULES}\n"
+            f"=== Schema ===\n{schema}\n\n"
+            f"Your previous SQL failed to execute.\n"
+            f"Previous SQL:\n{bad_sql}\n\n"
+            f"Database error:\n{error}\n\n"
+            f"Return a corrected DuckDB SQL query. Output ONLY the SQL.\n"
+            f"=== Question ===\n{question}\n\n=== SQL ===")
+
+
+def run_question(question: str, con, schema: str, client, model: str = "gpt-5-mini") -> QueryResult:
+    # 1. generate
+    sql = t2s.generate_sql(question, schema, client, model)
+
+    # 2. validate — safety failures are NOT retried
+    try:
+        safe_sql = sql_guard.validate_sql(sql)
+    except sql_guard.UnsafeSQLError as e:
+        return QueryResult(question, sql, None, error=f"Blocked by guardrail: {e}", blocked=True)
+
+    # 3. execute
+    try:
+        data = con.execute(safe_sql).fetchdf()
+        return QueryResult(question, safe_sql, data)
+    except Exception as exec_err:
+        # 4. self-correction: one retry with the error fed back
+        repair_prompt = _build_repair_prompt(question, schema, safe_sql, str(exec_err))
+        resp = client.responses.create(model=model, input=repair_prompt)
+        sql2 = t2s.clean_sql(resp.output_text)
+        try:
+            safe_sql2 = sql_guard.validate_sql(sql2)
+        except sql_guard.UnsafeSQLError as e:
+            return QueryResult(question, sql2, None, error=f"Repair blocked by guardrail: {e}", blocked=True)
+        try:
+            data = con.execute(safe_sql2).fetchdf()
+            return QueryResult(question, safe_sql2, data, repaired=True)
+        except Exception as exec_err2:
+            return QueryResult(question, safe_sql2, None,
+                               error=f"Failed after one self-correction: {exec_err2}")
+
+
+if __name__ == "__main__":
+    import db
+    from dotenv import load_dotenv
+    from openai import OpenAI
+
+    load_dotenv()
+    client = OpenAI()
+    con = db.get_connection()
+    schema = db.get_schema(con)
+
+    for q in [
+        "Which country has the best marketing efficiency?",
+        "Which product category is most profitable?",
+        "What is the average order value by customer segment?",
+    ]:
+        r = run_question(q, con, schema, client)
+        print(f"Q: {q}")
+        if r.error:
+            print(f"   ERROR: {r.error}")
+        else:
+            print(f"   SQL: {r.sql}")
+            print(f"   repaired: {r.repaired}")
+            print(f"   result: {r.data.head(3).to_dict('records')}")
+        print()
