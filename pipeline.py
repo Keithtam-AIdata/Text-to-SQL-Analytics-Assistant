@@ -80,6 +80,30 @@ def run_question(question: str, con, schema: str, client, model: str = "gpt-5-mi
                                error=f"Failed after one self-correction: {exec_err2}")
 
 
+def interpret_result(question: str, sql: str, df, client, model: str = "gpt-5-mini") -> str:
+    """Explain an executed query result in business language (4-part format).
+
+    The model interprets; it never computes. It is given the exact rows Python
+    produced and told to use only those numbers.
+    """
+    table_text = df.head(20).to_string(index=False)
+    prompt = (
+        "You are a business analytics assistant for an APAC e-commerce dataset.\n"
+        "Python already ran SQL and produced the result below. Explain it in clear\n"
+        "business language. Use ONLY the numbers in the result — invent nothing.\n\n"
+        "Respond in exactly this format:\n"
+        "Direct Answer:\n[1-2 sentences.]\n\n"
+        "KPI Evidence:\n[Key numbers from the result.]\n\n"
+        "Business Interpretation:\n[What it means for the business.]\n\n"
+        "Recommended Next Step:\n[One practical action.]\n\n"
+        f"=== Question ===\n{question}\n\n"
+        f"=== SQL executed ===\n{sql}\n\n"
+        f"=== Query result ===\n{table_text}\n"
+    )
+    resp = client.responses.create(model=model, input=prompt)
+    return resp.output_text
+
+
 if __name__ == "__main__":
     import db
     from dotenv import load_dotenv
