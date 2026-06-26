@@ -1,10 +1,27 @@
-# Text-to-SQL-Analytics-Assistant
+# Text-to-SQL Analytics Assistant
 
 A text-to-SQL analytics copilot. Ask a business question in plain English; the
 assistant **writes SQL, safety-checks it, runs it on a DuckDB warehouse, and
 explains the result** — showing you the exact query and data behind every answer.
 
-**[Live demo](https://ai-business-analyst-assistant-bnzdwzqs6eyetgbfawdnyp.streamlit.app/)**
+**[Live demo](https://text-to-sql-analytics-assistant-i4mqokeozgmpvbqibermts.streamlit.app/)**
+
+---
+
+## Why I built this
+
+Everyone keeps saying AI can help with all kinds of things, especially at work.
+I'd been wanting to actually try that for a while — to see what applying AI in
+practice really looks like — so I built this project.
+
+It took a lot of rewriting along the way. At one point I scrapped the whole
+approach and started over, because I learned something important: the AI would
+make up numbers and state them confidently. So I redirected the project toward
+text-to-SQL, with one goal — keep the output accurate. I wanted to use AI's
+strengths while making sure the numbers it gives are real, not guessed.
+
+I learned a lot building this, and it's only the start. I'll keep building more
+projects and learning as I go.
 
 ---
 
